@@ -1,24 +1,33 @@
 # TG → Discord Webhook Relay
 
-Бот пересылает сообщения из Telegram-каналов в **один Discord-канал через Discord Webhook**.
+Пересылает публикации из Telegram-каналов в один Discord-канал через Discord Webhook.
 
-## Как это работает
+## Настройка
 
-1. Создай Discord Webhook: Discord-канал → Edit Channel → Integrations → Webhooks → New Webhook.
-2. Скопируй Webhook URL.
-3. Создай **отдельного** Telegram-бота через BotFather и забери его токен.
-4. Добавь Telegram-бота администратором в нужные каналы.
-5. На Railway задай `TELEGRAM_BOT_TOKEN` и `DISCORD_WEBHOOK_URL`, поставь `PORT=8000` и задеплой новый репозиторий.
+Переменные окружения (или локальный `.env`):
 
-Бот пересылает текст, длинные сообщения частями, фото/документы/видео/аудио/голосовые и ссылки на оригиналы Telegram. Discord ограничивает файлы до 25 MB, поэтому здесь по умолчанию `MAX_FILE_MB=24`.
+- `TELEGRAM_BOT_TOKEN` — токен отдельного бота от @BotFather.
+- `DISCORD_WEBHOOK_URL` — URL Discord Webhook.
+- `SOURCE_CHANNEL_IDS` — необязательно, ID каналов через запятую. Пустое значение означает все каналы, где бот администратор.
+- `MAX_FILE_MB` — максимальный размер вложения, по умолчанию 24.
+- `PORT` — порт health endpoint, для Railway обычно 8000.
+- `DROP_PENDING_UPDATES` — `1` чтобы пропускать очередь старых обновлений при запуске.
 
-## Необязательно
+## Запуск
 
-`SOURCE_CHANNEL_IDS` — список ID каналов через запятую. Если пусто, бот слушает все каналы, где он добавлен и где у него есть права писать.
+```bash
+pip install -r requirements.txt
+python bot.py
+```
+
+Проверка состояния: `GET /health` (если задан `PORT`).
 
 ## Важно
 
-- Это схема **Telegram → Discord**, а не в обе стороны.
-- Discord Webhook не может читать Discord и отправлять ответы обратно в Telegram.
-- Токен регистрационного бота здесь не использовать одновременно с polling-ботом, потому что Telegram не позволяет корректно работать с одним токеном в двух продолжительных polling-процессах.
-- Не коммить `.env`: Discord Webhook URL является секретом.
+1. Добавьте бота **администратором** в каждый исходный Telegram-канал. Для пересылки публикаций используется `channel_post`.
+2. Запускайте только **один экземпляр** бота с данным токеном. Два polling-процесса с одним токеном конфликтуют (`TelegramConflictError: terminated by other getUpdates request`).
+3. На Railway задайте `TELEGRAM_BOT_TOKEN`, `DISCORD_WEBHOOK_URL`, `PORT=8000`.
+4. Не публикуйте `.env` и не добавляйте его в репозиторий. Используйте `.env.example` как шаблон.
+5. Это направление только Telegram → Discord. Webhook не читает сообщения Discord.
+
+Поддерживаются текст, фото, документы, видео, аудио, голосовые и video notes. Слишком большие вложения пропускаются с уведомлением.

@@ -109,7 +109,12 @@ async def handle_channel_post(message: Message, bot: Bot):
             if file_size and file_size > max_bytes:
                 await discord.send_text(f"{text}\n\n📎 Файл пропущен: больше {config.MAX_FILE_MB} MB (лимит Discord).", username=username)
                 return
-            downloaded = await bot.download_file(file_id)
+            # Telegram file_id is not a file_path. Resolve it first, then download
+            # using the path returned by get_file (required by aiogram 3.x).
+            telegram_file = await bot.get_file(file_id)
+            if not telegram_file.file_path:
+                raise RuntimeError(f"Telegram did not return file_path for {filename}")
+            downloaded = await bot.download_file(telegram_file.file_path)
             downloaded.seek(0)
             await discord.send_file(downloaded.read(), filename, text, username=username)
         else:
