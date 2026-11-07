@@ -1,0 +1,40 @@
+name: Keep Render Relay Awake
+
+on:
+  schedule:
+    # GitHub Actions supports scheduled runs at 5-minute intervals.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: render-relay-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping Render health endpoint
+        shell: bash
+        run: |
+          URL="https://tg-discord-relay.onrender.com/health"
+          for attempt in 1 2 3 4 5; do
+            echo "Attempt ${attempt}: ${URL}"
+            code=$(curl --silent --show-error --location \
+              --connect-timeout 15 --max-time 45 \
+              --output /tmp/health-response.txt \
+              --write-out '%{http_code}' "$URL" || true)
+            cat /tmp/health-response.txt 2>/dev/null || true
+            echo "HTTP status: ${code:-connection-error}"
+            if [[ "$code" =~ ^2[0-9][0-9]$ ]] && grep -q '"ok"[[:space:]]*:[[:space:]]*true' /tmp/health-response.txt; then
+              echo "Render relay health check passed."
+              exit 0
+            fi
+            if [[ "$attempt" -lt 5 ]]; then
+              echo "Service may be waking up; retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+          echo "Health check failed after 5 attempts."
+          exit 1
